@@ -126,9 +126,20 @@ def calculator(expression: str) -> str:
 def web_search(query: str, max_results: int = 5) -> str:
     """Search DuckDuckGo and return compact JSON results."""
     try:
-        from duckduckgo_search import DDGS
-        with DDGS() as ddgs:
-            res = list(ddgs.text(query, max_results=max_results))
+        try:
+            from ddgs import DDGS  # package renamed from duckduckgo-search
+        except ImportError:
+            from duckduckgo_search import DDGS
+        res, last_exc = [], None
+        for backend in ("auto", "duckduckgo", "auto"):  # results are flaky; retry
+            try:
+                res = list(DDGS().text(query, max_results=max_results, backend=backend))
+                if res:
+                    break
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+        if not res and last_exc:
+            raise last_exc
         return json.dumps([{"title": r.get("title"), "url": r.get("href"), "snippet": r.get("body")}
                            for r in res]) or "[]"
     except Exception as exc:  # noqa: BLE001
